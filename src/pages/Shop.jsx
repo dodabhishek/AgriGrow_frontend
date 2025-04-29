@@ -1,27 +1,29 @@
 import React, { useState, useEffect } from "react";
-import { FaFilter } from "react-icons/fa";
-import ProductCard from "./AdminPage/Card/productCard"; // Import the ProductCard component
+import ProductCard from "./AdminPage/Card/productCard";
 import { axiosInstance } from "../lib/axios";
-import { useAuthStore } from "../store/useAuthStore"; // Import auth store to get the logged-in user
+import { useAuthStore } from "../store/useAuthStore";
 
 export default function Shop() {
-  const [products, setProducts] = useState([]); // State to store products
+  const [products, setProducts] = useState([]);
   const [priceRange, setPriceRange] = useState([0, 100]);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [appliedPriceRange, setAppliedPriceRange] = useState([0, 100]);
-  const [quantities, setQuantities] = useState({}); // Track quantities for each product
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredProducts, setFilteredProducts] = useState([]);
+  const [selectedProduct, setSelectedProduct] = useState(null);
 
   const itemsPerPage = 9;
-  const { authUser } = useAuthStore(); // Get the logged-in user
+  const { authUser } = useAuthStore();
+  
 
-  // Fetch products from the backend
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         const res = await axiosInstance.get("/products");
         if (Array.isArray(res.data.products)) {
           setProducts(res.data.products);
+          setFilteredProducts(res.data.products);
         } else {
           console.error("Unexpected API response format");
         }
@@ -29,50 +31,75 @@ export default function Shop() {
         console.error("Error fetching products:", error.message);
       }
     };
-
     fetchProducts();
   }, []);
 
-  // Dynamically generate categories from products
-  const categories = ["All", ...new Set(products.map((product) => product.category || "Uncategorized"))];
+  const categories = [
+    "All",
+    "Vegetables",
+    "Fruits",
+    "Grains",
+    "Pulses",
+    "Seeds",
+    "Fertilizers",
+    "Tools"
+  ];
 
-  // Filter products based on price range and selected category
-  const filteredProducts = products
-    .filter((product) => product.price >= appliedPriceRange[0] && product.price <= appliedPriceRange[1])
-    .filter((product) => selectedCategory === "All" || product.category === selectedCategory);
-
-  // Paginate the filtered products
-  const paginatedProducts = filteredProducts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-
-  // Apply the price filter
-  const applyPriceFilter = () => {
-    setAppliedPriceRange(priceRange);
+  const handleSearch = () => {
+    const result = products.filter(
+      (product) =>
+        product.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+        (selectedCategory === "All" || product.category === selectedCategory) &&
+        product.price >= appliedPriceRange[0] &&
+        product.price <= appliedPriceRange[1]
+    );
+    setFilteredProducts(result);
+    setCurrentPage(1);
   };
 
-  // Handle adding a product to the cart
+  const applyPriceFilter = () => {
+    console.log("Price Range Applied:", priceRange); // Log to debug
+    setAppliedPriceRange(priceRange); // Update applied price range
+    handleSearch(); // Re-apply the search with the updated price range
+  };
+
   const handleAddToCart = async (productId) => {
     try {
       const response = await axiosInstance.post("/add-to-cart", {
-        userId: authUser._id, // Pass the logged-in user's ID
-        productId, // Pass the product ID
+        userId: authUser._id,
+        productId,
       });
-      console.log(response.data.message); // Log success message
+      console.log(response.data.message);
     } catch (error) {
       console.error("Error adding product to cart:", error.message);
     }
   };
 
+  const openProductPopup = (product) => {
+    setSelectedProduct(product);
+  };
+
+  const closePopup = () => {
+    setSelectedProduct(null);
+  };
+
+  const goToCart = () => {
+    window.location.href = "/cart";
+  };
+
+  const paginatedProducts = filteredProducts.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   return (
     <div className="max-w-7xl mx-auto px-0 p-6">
-      {/* Shop Header */}
       <div className="text-center py-10">
         <img src="/images/ShopHeader.jpg" alt="Shop Header" className="w-full mx-auto" />
       </div>
 
       <div className="grid grid-cols-4 gap-6">
-        {/* Sidebar for Filters */}
         <aside className="col-span-1 border p-4 rounded-lg">
-          {/* Price Filter */}
           <div className="border p-4 rounded-lg mb-6">
             <h3 className="font-bold mb-2">Price</h3>
             <div className="flex justify-between text-sm">
@@ -100,7 +127,6 @@ export default function Shop() {
             </button>
           </div>
 
-          {/* Category Filter */}
           <h3 className="font-bold mb-2">Categories</h3>
           <ul>
             {categories.map((category) => (
@@ -117,28 +143,44 @@ export default function Shop() {
           </ul>
         </aside>
 
-        {/* Main Content */}
         <main className="col-span-3">
-          {/* Product Grid */}
+          <div className="flex justify-center mb-6">
+            <input
+              type="text"
+              className="border p-2 w-full max-w-md rounded-md"
+              placeholder="Search for a product..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <button
+              onClick={handleSearch}
+              className="bg-green-500 text-white px-6 py-2 ml-4 rounded-md"
+            >
+              Search
+            </button>
+          </div>
+
           <div className="grid grid-cols-3 gap-6">
             {paginatedProducts.length > 0 ? (
+              
               paginatedProducts.map((product) => (
+                
                 <ProductCard
                   key={product._id}
-                  productId={product._id} // Pass the product ID
+                  productId={product._id}
                   name={product.name}
                   price={product.price}
-                  imageUrl={product.imageUrl} // Use imageUrl from the backend
-                  onAddToCart={() => handleAddToCart(product._id)} // Handle Add to Cart
-                  showControls={true} // Show + and - buttons
+                  imageUrl={product.imageUrl}
+                  onAddToCart={() => handleAddToCart(product._id)}
+                  showControls={true}
+                  onClick={() => openProductPopup(product)} // Trigger the popup when clicking on the product
                 />
               ))
             ) : (
-              <p className="text-center text-gray-500 col-span-3">No products found.</p>
+              <p className="text-center text-gray-500 col-span-3">Product not available.</p>
             )}
           </div>
 
-          {/* Pagination */}
           <div className="flex justify-center space-x-4 mt-6">
             {Array.from({ length: Math.ceil(filteredProducts.length / itemsPerPage) }, (_, i) => i + 1).map((num) => (
               <button
@@ -152,6 +194,28 @@ export default function Shop() {
           </div>
         </main>
       </div>
+
+      {selectedProduct && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-end z-50">
+          <div className="bg-white w-full md:w-1/2 h-1/2 rounded-t-2xl p-6 overflow-auto relative">
+            <button
+              onClick={closePopup}
+              className="absolute top-2 right-4 text-gray-600 text-xl font-bold"
+            >
+              &times;
+            </button>
+            <img src={selectedProduct.imageUrl} alt={selectedProduct.name} className="w-full h-40 object-contain mb-4" />
+            <h2 className="text-xl font-bold">{selectedProduct.name}</h2>
+            <p className="text-gray-700">Price: ${selectedProduct.price}</p>
+            <button
+              className="mt-6 bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700"
+              onClick={goToCart}
+            >
+              Proceed to Checkout
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
