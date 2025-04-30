@@ -17,28 +17,19 @@ import ChatPage from "./pages/ChatPage.jsx";
 import { useAuthStore } from "./store/useAuthStore.js";
 import { useThemeStore } from "./store/useThemeStore.js";
 import { Toaster } from "react-hot-toast";
-import { Loader } from "lucide-react";
 
 const App = () => {
-  const { authUser, isCheckingAuth, hasCheckedAuth, checkAuth } = useAuthStore();
+  const { authUser, hasCheckedAuth, checkAuth } = useAuthStore();
   const { theme } = useThemeStore();
 
-  // Check authentication on app load
   useEffect(() => {
-    // Only check auth if we haven't checked yet and aren't already checking
-    if (!hasCheckedAuth && !isCheckingAuth) {
-      checkAuth();
-    }
-  }, [hasCheckedAuth, isCheckingAuth]);
-
-  // Show a loader while authentication is being checked
-  if (isCheckingAuth && !hasCheckedAuth) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader className="size-10 animate-spin" />
-      </div>
-    );
-  }
+    const initializeAuth = async () => {
+      if (!hasCheckedAuth) {
+        await checkAuth();
+      }
+    };
+    initializeAuth();
+  }, []);
 
   return (
     <div data-theme={theme}>
